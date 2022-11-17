@@ -1,0 +1,81 @@
+workflow:
+  name: 'NODESJS Deployment in EC2'
+
+image:
+  name: hashicorp/terraform:light
+  entrypoint:
+  - 'usr/bin/env'
+  - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+before_script:
+  - rm -rf .terraform
+  - terraform --version
+  - export TF_VAR_access_key=""
+  - export TF_VAR_secret_key=""
+  - export TF_VAR_token=""
+  - export TF_LOG=TRACE
+  - export TF_VAR_key_name=""
+  - terraform init
+
+stages:
+  - dev
+  - qa
+  - prod
+
+dev-plan:
+  stage: dev
+    script:
+      - echo "Dev-Plan"
+      - terraform plan --var-file="terraform.auto.tfvars" -out "dev.tfplan"
+    artifacts:
+      paths:
+        - dev.tfplan
+    environment: Dev
+dev-apply:
+  stage: dev
+    script:
+      - echo "Dev-Apply"
+      - terraform apply  --var-file="terraform.auto.tfvars" "dev.tfplan"
+    dependencies:
+      - dev-plan
+    environment: Dev  
+
+qa-plan:
+  stage: qa
+    script:
+      - echo "qa-Plan"
+      - terraform plan --var-file="terraform.auto.tfvars" -out "qa.tfplan"
+    dependencies:
+      - dev-apply  
+    artifacts:
+      paths:
+        - qa.tfplan
+    environment: QA        
+qa-apply:
+  stage: qa
+    script:
+      - echo "qa-Apply"
+      - terraform apply --var-file="terraform.auto.tfvars" "qa.tfplan"
+    dependencies:
+      - qa-plan
+    environment: QA            
+ 
+prod-plan:
+  stage: prod
+    script:
+      - echo "prod-Plan"
+      - terraform plan --var-file="terraform.auto.tfvars" -out "prod.tfplan"
+    dependencies:
+      - dev-apply  
+    artifacts:
+      paths:
+        - prod.tfplan
+    environment: PROD        
+prod-apply:
+  stage: prod
+    script:
+      - echo "prod-Apply"
+      - terraform apply  --var-file="terraform.auto.tfvars" "prod.tfplan"
+    dependencies:
+      - prod-plan
+    environment: PROD      
